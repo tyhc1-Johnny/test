@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F6 Analytical Chemistry: Interactive ATR-FTIR Spectrometer</title>
+<style>
+  :root {
+    --bg-main: #f4f6f9;
+    --card-bg: #ffffff;
+    --text-primary: #1e293b;
+    --text-muted: #64748b;
+    --border: #cbd5e1;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --success: #16a34a;
+    --warning: #d97706;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { background-color: var(--bg-main); color: var(--text-primary); padding: 20px; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  header { background: var(--card-bg); padding: 18px 24px; border-radius: 10px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 1.35rem; color: #0f172a; }
+  header span { font-size: 0.85rem; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
+
+  .grid-layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .panel-title { font-size: 1rem; font-weight: 700; color: #334155; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+  /* Instrument Bench */
+  .instrument-box { background: #0f172a; border-radius: 8px; padding: 16px; color: #f8fafc; text-align: center; position: relative; }
+  .crystal-stage { width: 140px; height: 140px; background: #334155; margin: 15px auto; border-radius: 50%; border: 4px solid #64748b; position: relative; display: flex; align-items: center; justify-content: center; }
+  .diamond-crystal { width: 44px; height: 44px; background: #93c5fd; transform: rotate(45deg); border: 2px solid #e0f2fe; box-shadow: 0 0 10px rgba(147, 197, 253, 0.6); transition: all 0.3s; }
+  .liquid-drop { width: 36px; height: 36px; background: rgba(239, 68, 68, 0.75); border-radius: 50%; position: absolute; display: none; }
+  .clamp-arm { width: 18px; height: 70px; background: #94a3b8; position: absolute; top: 10px; border-radius: 4px; border: 2px solid #475569; transition: transform 0.4s ease; transform: translateY(-30px); }
+  .clamp-arm.clamped { transform: translateY(22px); background: #f59e0b; }
+
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+  label { font-size: 0.85rem; font-weight: 600; color: #475569; }
+  select, button { padding: 10px 14px; border-radius: 6px; font-size: 0.9rem; border: 1px solid var(--border); }
+  select { background: #fff; cursor: pointer; }
+  button { background: var(--accent); color: #fff; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { background: #cbd5e1; cursor: not-allowed; color: #64748b; }
+
+  .status-badge { display: inline-block; padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; background: #f1f5f9; color: #475569; font-weight: 600; }
+  .status-badge.ready { background: #dcfce7; color: #15803d; }
+  .status-badge.scanning { background: #fef3c7; color: #b45309; }
+
+  /* Canvas & Spectrum Area */
+  .canvas-container { position: relative; width: 100%; height: 430px; background: #ffffff; }
+  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .tooltip { position: absolute; background: rgba(15, 23, 42, 0.9); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; pointer-events: none; display: none; line-height: 1.4; border-left: 3px solid #38bdf8; z-index: 10; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border); }
+  .btn-secondary { background: #fff; color: #334155; border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { background: #f1f5f9; }
+
+  /* Quiz Modal / Challenge Box */
+  .quiz-box { background: #f8fafc; border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 0 6px 6px 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 10px; }
+  .feedback-msg { padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; display: none; }
+  .feedback-msg.correct { background: #dcfce7; color: #166534; }
+  .feedback-msg.wrong { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>HKDSE Analytical Chemistry: FTIR Spectrometer</h1>
+      <p style="font-size: 0.85rem; color: var(--text-muted);">Attenuated Total Reflectance (ATR) Infrared Spectroscopy Simulation</p>
+    </div>
+    <span>Form 6 Elective (Topic XV)</span>
+  </header>
+
+  <div class="grid-layout">
+    <!-- Left Column: Controls & Instrument Stage -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Instrument Stage</span>
+        <span id="systemStatus" class="status-badge">Standby</span>
+      </div>
+
+      <div class="instrument-box">
+        <div style="font-size: 0.8rem; color: #94a3b8;">ATR Diamond Crystal Platform</div>
+        <div class="crystal-stage">
+          <div class="clamp-arm" id="clampArm"></div>
+          <div class="diamond-crystal"></div>
+          <div class="liquid-drop" id="liquidDrop"></div>
+        </div>
+        <div id="stageReadout" style="font-size: 0.8rem; color: #38bdf8;">Stage Clean & Empty</div>
+      </div>
+
+      <div class="control-group">
+        <label for="sampleSelect">Select Testing Sample</label>
+        <select id="sampleSelect">
+          <option value="ethanol">Ethanol (Alcohol, CH3CH2OH)</option>
+          <option value="ethanoic_acid">Ethanoic Acid (Carboxylic Acid, CH3COOH)</option>
+          <option value="propanone">Propan-2-one (Ketone, CH3COCH3)</option>
+          <option value="ethyl_ethanoate">Ethyl Ethanoate (Ester, CH3COOCH2CH3)</option>
+          <option value="hexane">Hexane (Alkane, C6H14)</option>
+          <option value="unknown_a">Unknown Sample X (Mystery)</option>
+          <option value="unknown_b">Unknown Sample Y (Mystery)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button id="btnBackground" style="flex: 1;">1. Air Background</button>
+        <button id="btnLoad" style="flex: 1;" disabled>2. Load Sample</button>
+      </div>
+
+      <button id="btnScan" disabled>3. Acquire FTIR Spectrum</button>
+
+      <!-- Mystery Deduction Challenge -->
+      <div class="quiz-box" id="mysteryQuiz" style="display: none;">
+        <strong>Deduction Task: Identify Mystery Sample</strong>
+        <p style="color: var(--text-muted); font-size: 0.8rem;">Observe the absorption bands and identify the predominant functional group:</p>
+        <select id="quizAnswer">
+          <option value="">-- Choose Functional Group --</option>
+          <option value="alcohol">Alcohol (Contains O-H stretch ~3300 cm⁻¹)</option>
+          <option value="carboxylic">Carboxylic Acid (Broad O-H ~2500-3300 cm⁻¹ + C=O ~1715 cm⁻¹)</option>
+          <option value="carbonyl">Carbonyl / Ketone (Strong C=O ~1715 cm⁻¹)</option>
+          <option value="ester">Ester (C=O ~1740 cm⁻¹ + strong C-O ~1240 cm⁻¹)</option>
+          <option value="alkane">Hydrocarbon / Alkane (Only C-H stretches < 3000 cm⁻¹)</option>
+        </select>
+        <button id="btnCheckQuiz" class="btn-secondary">Check Deduction</button>
+        <div id="quizFeedback" class="feedback-msg"></div>
+      </div>
+    </div>
+
+    <!-- Right Column: Spectrum Canvas & Tools -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Infrared Spectrum Viewport (% Transmittance vs. Wavenumber)</span>
+        <span id="spectrumInfo" style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted);">No Spectrum</span>
+      </div>
+
+      <div class="toolbar">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <input type="checkbox" id="chkShowZones" checked>
+          <span>Highlight HKDSE Diagnostic Zones</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <input type="checkbox" id="chkPeakLabels" checked>
+          <span>Show Peak Wavenumbers</span>
+        </label>
+        <button id="btnClear" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Reset View</button>
+      </div>
+
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="irCanvas"></canvas>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+
+      <!-- Quick HKDSE Reference Strip -->
+      <div style="font-size: 0.8rem; color: #475569; background: #f1f5f9; padding: 10px 14px; border-radius: 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;">
+        <div><strong style="color: #0284c7;">■ O-H (Alcohol):</strong> 3230–3670 cm⁻¹</div>
+        <div><strong style="color: #ea580c;">■ O-H (Acid):</strong> 2500–3300 cm⁻¹</div>
+        <div><strong style="color: #dc2626;">■ C=O (Carbonyl):</strong> 1680–1750 cm⁻¹</div>
+        <div><strong style="color: #16a34a;">■ C-H (sp³):</strong> 2850–2960 cm⁻¹</div>
+        <div><strong style="color: #9333ea;">■ C-O:</strong> 1050–1300 cm⁻¹</div>
+        <div><strong style="color: #64748b;">■ Fingerprint:</strong> &lt; 1500 cm⁻¹</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- SPECTRAL DATA DEFINITIONS ---
+// Peaks are modeled as Gaussian absorption bands: [center_wavenumber, depth, width_sigma, bond_label]
+const SAMPLES = {
+  ethanol: {
+    name: "Ethanol (CH3CH2OH)",
+    peaks: [
+      { nu: 3340, amp: 72, sig: 130, bond: "O-H stretch (alcohol, broad, H-bonded)" },
+      { nu: 2975, amp: 46, sig: 22,  bond: "C-H sp³ asymmetric stretch" },
+      { nu: 2890, amp: 28, sig: 20,  bond: "C-H sp³ symmetric stretch" },
+      { nu: 1450, amp: 22, sig: 20,  bond: "C-H bending" },
+      { nu: 1380, amp: 20, sig: 18,  bond: "C-H bending" },
+      { nu: 1088, amp: 55, sig: 25,  bond: "C-O stretch" },
+      { nu: 1048, amp: 68, sig: 22,  bond: "C-O stretch (primary alcohol)" },
+      { nu: 880,  amp: 24, sig: 25,  bond: "C-C-O skeletal vibration" }
+    ]
+  },
+  ethanoic_acid: {
+    name: "Ethanoic Acid (CH3COOH)",
+    peaks: [
+      { nu: 3000, amp: 58, sig: 280, bond: "O-H stretch (carboxylic acid, very broad)" },
+      { nu: 2930, amp: 22, sig: 20,  bond: "C-H stretch (superimposed on O-H envelope)" },
+      { nu: 1715, amp: 88, sig: 22,  bond: "C=O stretch (carboxylic acid carbonyl)" },
+      { nu: 1415, amp: 32, sig: 20,  bond: "C-O-H in-plane bend" },
+      { nu: 1285, amp: 62, sig: 35,  bond: "C-O stretch" },
+      { nu: 935,  amp: 36, sig: 40,  bond: "O-H out-of-plane bend (dimer)" }
+    ]
+  },
+  propanone: {
+    name: "Propan-2-one (Acetone, CH3COCH3)",
+    peaks: [
+      { nu: 3005, amp: 18, sig: 20,  bond: "C-H stretch" },
+      { nu: 2965, amp: 38, sig: 24,  bond: "C-H sp³ stretch" },
+      { nu: 2920, amp: 24, sig: 20,  bond: "C-H sp³ stretch" },
+      { nu: 1715, amp: 90, sig: 18,  bond: "C=O stretch (ketone carbonyl, sharp)" },
+      { nu: 1420, amp: 30, sig: 18,  bond: "C-H bending (methyl)" },
+      { nu: 1365, amp: 44, sig: 18,  bond: "C-H bending (gem-dimethyl doublet)" },
+      { nu: 1222, amp: 48, sig: 28,  bond: "C-C(=O)-C skeletal vibration" }
+    ]
+  },
+  ethyl_ethanoate: {
+    name: "Ethyl Ethanoate (CH3COOCH2CH3)",
+    peaks: [
+      { nu: 2985, amp: 36, sig: 22,  bond: "C-H sp³ stretch" },
+      { nu: 1740, amp: 90, sig: 20,  bond: "C=O stretch (ester carbonyl)" },
+      { nu: 1375, amp: 32, sig: 18,  bond: "C-H bending" },
+      { nu: 1242, amp: 82, sig: 30,  bond: "C-O ester asymmetric stretch" },
+      { nu: 1048, amp: 64, sig: 25,  bond: "C-O-C symmetric stretch" }
+    ]
+  },
+  hexane: {
+    name: "Hexane (C6H14)",
+    peaks: [
+      { nu: 2960, amp: 78, sig: 22,  bond: "C-H sp³ asymmetric stretch (CH3)" },
+      { nu: 2930, amp: 84, sig: 20,  bond: "C-H sp³ asymmetric stretch (CH2)" },
+      { nu: 2862, amp: 60, sig: 18,  bond: "C-H sp³ symmetric stretch" },
+      { nu: 1465, amp: 45, sig: 20,  bond: "C-H scissoring (CH2)" },
+      { nu: 1380, amp: 28, sig: 18,  bond: "C-H bend (methyl rock)" },
+      { nu: 725,  amp: 26, sig: 18,  bond: "-(CH2)n- rocking (n >= 4)" }
+    ]
+  },
+  unknown_a: {
+    name: "Mystery Sample X",
+    target: "alcohol",
+    reason: "Contains a broad, rounded O-H stretch at ~3340 cm⁻¹ and C-O stretch at ~1050 cm⁻¹ without any C=O peak at 1700 cm⁻¹.",
+    peaks: [
+      { nu: 3340, amp: 75, sig: 135, bond: "O-H stretch (broad, H-bonded)" },
+      { nu: 2960, amp: 55, sig: 24,  bond: "C-H sp³ stretch" },
+      { nu: 1460, amp: 26, sig: 20,  bond: "C-H bending" },
+      { nu: 1055, amp: 70, sig: 25,  bond: "C-O stretch" }
+    ]
+  },
+  unknown_b: {
+    name: "Mystery Sample Y",
+    target: "carboxylic",
+    reason: "Exhibits an extremely broad O-H absorption band from 2500–3300 cm⁻¹ overlapping with C-H, paired with an intense C=O dagger peak at 1715 cm⁻¹.",
+    peaks: [
+      { nu: 2980, amp: 55, sig: 270, bond: "O-H stretch (very broad carboxylic envelope)" },
+      { nu: 1715, amp: 88, sig: 20,  bond: "C=O stretch (carbonyl)" },
+      { nu: 1280, amp: 60, sig: 30,  bond: "C-O stretch" }
+    ]
+  }
+};
+
+// HKDSE Diagnostic reference regions
+const REGIONS = [
+  { min: 3230, max: 3670, color: "rgba(2, 132, 199, 0.12)", label: "O-H (alcohol)" },
+  { min: 2500, max: 3300, color: "rgba(234, 88, 12, 0.10)", label: "O-H (acid)" },
+  { min: 2850, max: 2960, color: "rgba(22, 163, 74, 0.12)", label: "C-H (sp³)" },
+  { min: 1680, max: 1750, color: "rgba(220, 38, 38, 0.12)", label: "C=O (carbonyl)" },
+  { min: 1050, max: 1300, color: "rgba(147, 51, 234, 0.10)", label: "C-O" },
+  { min: 500,  max: 1500, color: "rgba(100, 116, 139, 0.08)", label: "Fingerprint Region" }
+];
+
+// App State
+let state = {
+  backgroundDone: false,
+  sampleLoaded: false,
+  scanned: false,
+  currentSampleKey: "ethanol",
+  spectrumData: [],
+  mousePos: null,
+  scanProgress: 1.0
+};
+
+// DOM Elements
+const canvas = document.getElementById("irCanvas");
+const ctx = canvas.getContext("2d");
+const container = document.getElementById("canvasContainer");
+const tooltip = document.getElementById("tooltip");
+const btnBackground = document.getElementById("btnBackground");
+const btnLoad = document.getElementById("btnLoad");
+const btnScan = document.getElementById("btnScan");
+const btnClear = document.getElementById("btnClear");
+const sampleSelect = document.getElementById("sampleSelect");
+const systemStatus = document.getElementById("systemStatus");
+const stageReadout = document.getElementById("stageReadout");
+const clampArm = document.getElementById("clampArm");
+const liquidDrop = document.getElementById("liquidDrop");
+const spectrumInfo = document.getElementById("spectrumInfo");
+const chkShowZones = document.getElementById("chkShowZones");
+const chkPeakLabels = document.getElementById("chkPeakLabels");
+const mysteryQuiz = document.getElementById("mysteryQuiz");
+const btnCheckQuiz = document.getElementById("btnCheckQuiz");
+const quizFeedback = document.getElementById("quizFeedback");
+const quizAnswer = document.getElementById("quizAnswer");
+
+// Resize Canvas
+function resizeCanvas() {
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  render();
+}
+window.addEventListener("resize", resizeCanvas);
+
+// Generate Spectrum Curve Data
+function generateSpectrum(sampleKey) {
+  const sample = SAMPLES[sampleKey];
+  const data = [];
+  const minNu = 500;
+  const maxNu = 4000;
+  const step = 2.5;
+
+  for (let nu = maxNu; nu >= minNu; nu -= step) {
+    // Gentle baseline transmittance around 97% with minor realistic drift
+    let t = 97.0 - (4000 - nu) * 0.0015;
+    t += (Math.random() - 0.5) * 0.4; // Detector noise
+
+    // Subtract absorption dips
+    sample.peaks.forEach(p => {
+      const delta = nu - p.nu;
+      const gaussian = Math.exp(-(delta * delta) / (2 * p.sig * p.sig));
+      t -= p.amp * gaussian;
+    });
+
+    data.push({ nu: nu, t: Math.max(4.0, Math.min(100.0, t)) });
+  }
+  return data;
+}
+
+// Coordinate conversions
+function getPlotBounds() {
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  return {
+    left: 65,
+    right: w - 25,
+    top: 30,
+    bottom: h - 45,
+    width: (w - 25) - 65,
+    height: (h - 45) - 30
+  };
+}
+
+function nuToX(nu, bounds) {
+  // Standard IR x-axis is reversed: 4000 cm⁻¹ on the left, 500 cm⁻¹ on the right
+  return bounds.left + ((4000 - nu) / 3500) * bounds.width;
+}
+
+function xToNu(x, bounds) {
+  return 4000 - ((x - bounds.left) / bounds.width) * 3500;
+}
+
+function tToY(t, bounds) {
+  // 100% T at top, 0% at bottom
+  return bounds.top + ((100 - t) / 100) * bounds.height;
+}
+
+// Rendering Function
+function render() {
+  const bounds = getPlotBounds();
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw HKDSE Diagnostic Shaded Zones
+  if (chkShowZones.checked) {
+    REGIONS.forEach(r => {
+      const xStart = nuToX(Math.min(4000, r.max), bounds);
+      const xEnd = nuToX(Math.max(500, r.min), bounds);
+      ctx.fillStyle = r.color;
+      ctx.fillRect(xStart, bounds.top, xEnd - xStart, bounds.height);
+
+      ctx.fillStyle = "#475569";
+      ctx.font = "9px sans-serif";
+      ctx.fillText(r.label, xStart + 4, bounds.top + 12);
+    });
+  }
+
+  // Draw Grid Lines & Axes
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1;
+
+  // Wavenumber Grid & Labels
+  ctx.fillStyle = "#64748b";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "center";
+
+  for (let nu = 4000; nu >= 500; nu -= 500) {
+    const x = nuToX(nu, bounds);
+    ctx.beginPath();
+    ctx.moveTo(x, bounds.top);
+    ctx.lineTo(x, bounds.bottom);
+    ctx.stroke();
+    ctx.fillText(nu, x, bounds.bottom + 18);
+  }
+
+  // % Transmittance Grid & Labels
+  ctx.textAlign = "right";
+  for (let t = 0; t <= 100; t += 20) {
+    const y = tToY(t, bounds);
+    ctx.beginPath();
+    ctx.moveTo(bounds.left, y);
+    ctx.lineTo(bounds.right, y);
+    ctx.stroke();
+    ctx.fillText(t + "%", bounds.left - 8, y + 4);
+  }
+
+  // Axis Labels
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Wavenumber / cm⁻¹", bounds.left + bounds.width / 2, bounds.bottom + 36);
+
+  ctx.save();
+  ctx.translate(18, bounds.top + bounds.height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("% Transmittance", 0, 0);
+  ctx.restore();
+
+  // Plot Spectral Curve
+  if (state.spectrumData.length > 0) {
+    const visiblePoints = Math.floor(state.spectrumData.length * state.scanProgress);
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#1e3a8a"; // Deep navy blue line
+    ctx.lineWidth = 1.7;
+
+    for (let i = 0; i < visiblePoints; i++) {
+      const pt = state.spectrumData[i];
+      const x = nuToX(pt.nu, bounds);
+      const y = tToY(pt.t, bounds);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Render Peak Absorption Wavenumber Tags
+    if (chkPeakLabels.checked && state.scanProgress >= 1.0) {
+      const sample = SAMPLES[state.currentSampleKey];
+      sample.peaks.forEach(p => {
+        if (p.amp >= 25) {
+          const px = nuToX(p.nu, bounds);
+          // Find matching point in data
+          const pt = state.spectrumData.find(d => Math.abs(d.nu - p.nu) < 3);
+          if (pt) {
+            const py = tToY(pt.t, bounds);
+            ctx.fillStyle = "#dc2626";
+            ctx.beginPath();
+            ctx.arc(px, py, 3, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = "#0f172a";
+            ctx.font = "bold 10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(Math.round(p.nu), px, py + 14);
+          }
+        }
+      });
+    }
+  }
+
+  // Draw Crosshair & Hover Tooltip
+  if (state.mousePos && state.spectrumData.length > 0 && state.scanProgress >= 1.0) {
+    const mx = state.mousePos.x;
+    const my = state.mousePos.y;
+
+    if (mx >= bounds.left && mx <= bounds.right && my >= bounds.top && my <= bounds.bottom) {
+      const targetNu = xToNu(mx, bounds);
+      const closest = state.spectrumData.reduce((prev, curr) =>
+        Math.abs(curr.nu - targetNu) < Math.abs(prev.nu - targetNu) ? curr : prev
+      );
+
+      const cx = nuToX(closest.nu, bounds);
+      const cy = tToY(closest.t, bounds);
+
+      // Crosshair lines
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.moveTo(cx, bounds.top);
+      ctx.lineTo(cx, bounds.bottom);
+      ctx.moveTo(bounds.left, cy);
+      ctx.lineTo(bounds.right, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Point circle
+      ctx.fillStyle = "#2563eb";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Tooltip positioning & bond label determination
+      const sample = SAMPLES[state.currentSampleKey];
+      const matchPeak = sample.peaks.find(p => Math.abs(p.nu - closest.nu) <= (p.sig * 1.3));
+      let bondText = matchPeak ? `<br><strong style="color:#38bdf8;">${matchPeak.bond}</strong>` : "";
+
+      tooltip.style.display = "block";
+      tooltip.style.left = (mx + 15) + "px";
+      tooltip.style.top = (my - 20) + "px";
+      tooltip.innerHTML = `<strong>Wavenumber:</strong> ${Math.round(closest.nu)} cm⁻¹<br><strong>Transmittance:</strong> ${closest.t.toFixed(1)}%${bondText}`;
+    } else {
+      tooltip.style.display = "none";
+    }
+  } else {
+    tooltip.style.display = "none";
+  }
+}
+
+// Interaction Listeners
+container.addEventListener("mousemove", (e) => {
+  const rect = container.getBoundingClientRect();
+  state.mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  render();
+});
+
+container.addEventListener("mouseleave", () => {
+  state.mousePos = null;
+  tooltip.style.display = "none";
+  render();
+});
+
+// Button 1: Air Background Scan
+btnBackground.addEventListener("click", () => {
+  systemStatus.textContent = "Scanning Background...";
+  systemStatus.className = "status-badge scanning";
+  stageReadout.textContent = "Scanning Blank ATR Diamond...";
+  btnBackground.disabled = true;
+
+  setTimeout(() => {
+    state.backgroundDone = true;
+    systemStatus.textContent = "Ready for Sample";
+    systemStatus.className = "status-badge ready";
+    stageReadout.textContent = "Air Background Stored (CO2/H2O Zeroed)";
+    btnLoad.disabled = false;
+  }, 1000);
+});
+
+// Button 2: Load Sample onto Crystal
+btnLoad.addEventListener("click", () => {
+  state.sampleLoaded = true;
+  liquidDrop.style.display = "block";
+  clampArm.classList.add("clamped");
+  stageReadout.textContent = "Sample Clamped on Diamond";
+  btnScan.disabled = false;
+  btnLoad.disabled = true;
+
+  const key = sampleSelect.value;
+  state.currentSampleKey = key;
+  spectrumInfo.textContent = SAMPLES[key].name;
+
+  if (key.startsWith("unknown")) {
+    mysteryQuiz.style.display = "flex";
+    quizFeedback.style.display = "none";
+    quizAnswer.value = "";
+  } else {
+    mysteryQuiz.style.display = "none";
+  }
+});
+
+// Button 3: Run FTIR Scan (Animated)
+btnScan.addEventListener("click", () => {
+  systemStatus.textContent = "Interferometer Scanning...";
+  systemStatus.className = "status-badge scanning";
+  btnScan.disabled = true;
+
+  state.spectrumData = generateSpectrum(state.currentSampleKey);
+  state.scanProgress = 0.0;
+  state.scanned = true;
+
+  const duration = 1400; // ms
+  const startTime = performance.now();
+
+  function animateScan(time) {
+    const elapsed = time - startTime;
+    state.scanProgress = Math.min(1.0, elapsed / duration);
+    render();
+
+    if (state.scanProgress < 1.0) {
+      requestAnimationFrame(animateScan);
+    } else {
+      systemStatus.textContent = "Scan Completed";
+      systemStatus.className = "status-badge ready";
+    }
+  }
+  requestAnimationFrame(animateScan);
+});
+
+// Toggle Controls
+chkShowZones.addEventListener("change", render);
+chkPeakLabels.addEventListener("change", render);
+
+btnClear.addEventListener("click", () => {
+  state.spectrumData = [];
+  state.scanProgress = 0;
+  state.sampleLoaded = false;
+  liquidDrop.style.display = "none";
+  clampArm.classList.remove("clamped");
+  stageReadout.textContent = "Stage Clean & Empty";
+  spectrumInfo.textContent = "No Spectrum";
+  btnLoad.disabled = !state.backgroundDone;
+  btnScan.disabled = true;
+  mysteryQuiz.style.display = "none";
+  render();
+});
+
+sampleSelect.addEventListener("change", () => {
+  if (state.sampleLoaded) {
+    btnClear.click();
+  }
+});
+
+// Quiz Deduction Check
+btnCheckQuiz.addEventListener("click", () => {
+  const ans = quizAnswer.value;
+  const sample = SAMPLES[state.currentSampleKey];
+  quizFeedback.style.display = "block";
+
+  if (!ans) {
+    quizFeedback.className = "feedback-msg wrong";
+    quizFeedback.textContent = "Please select a functional group deduction.";
+    return;
+  }
+
+  if (ans === sample.target) {
+    quizFeedback.className = "feedback-msg correct";
+    quizFeedback.innerHTML = `✓ Correct Deduction!<br>${sample.reason}`;
+  } else {
+    quizFeedback.className = "feedback-msg wrong";
+    quizFeedback.innerHTML = `✗ Incorrect. Re-examine the characteristic peak positions. ${sample.reason}`;
+  }
+});
+
+// Initial Setup
+resizeCanvas();
+</script>
+</body>
+</html>
